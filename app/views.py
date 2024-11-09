@@ -5,15 +5,15 @@ from django.db.models import Q
 from django.shortcuts import render
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
-from .forms import CustomUserCreationForm, LoginForm, ProfileForm, ReviewForm, CategoryForm
+from .forms import CustomUserCreationForm, LoginForm, ProfileForm, ReviewForm, CategoryForm, AddBalanceForm, \
+    ProviderForm
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.models import User
 from .models import Profile, Provider, Service, Category
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponseForbidden
-
+from django.http import HttpResponseForbidden, JsonResponse
 
 logger = logging.getLogger(__name__)
 
@@ -238,77 +238,65 @@ from django.shortcuts import redirect
 from decimal import Decimal
 
 def profile(request, user_id):
-    # Obter o perfil do usuário pela ID fornecida
+    # Get the user's profile
     user_profile = get_object_or_404(Profile, user_id=user_id)
 
-    # Tentar obter o provider associado ao perfil
-    try:
-        provider = Provider.objects.get(profile=user_profile)
-        is_provider = True
-        avg_rating = provider.reviews.aggregate(Avg('rating'))['rating__avg'] or 0
-        reviews = provider.reviews.all().order_by('-created_at')
-        services = provider.services.filter(approval='approved')  # Obter apenas serviços aprovados
-    except Provider.DoesNotExist:
-        is_provider = False
-        avg_rating = 0
-        reviews = []
-        services = []
+    # Initialize forms
+    profile_form = ProfileForm(instance=user_profile)
+    provider_form = None
+    if hasattr(user_profile, 'provider'):
+        provider_form = ProviderForm(instance=user_profile.provider)
+    review_form = ReviewForm()
+    add_balance_form = AddBalanceForm()
 
-    # Adicionar balance (somente para o próprio perfil)
-    if request.method == 'POST' and "add_balance" in request.POST:
-        balance_to_add = request.POST.get("balance_amount", "0")
-        try:
-            balance_to_add = Decimal(balance_to_add)  # Converter para Decimal
-            if request.user.id == user_id:  # Garantir que o usuário está editando seu próprio perfil
-                user_profile.wallet += balance_to_add
+    # Get the provider instance if it exists
+    provider = user_profile.provider if hasattr(user_profile, 'provider') else None
+    is_provider = provider is not None
+    approved_services = provider.services.filter(approval='approved') if is_provider else None
+    avg_rating = provider.reviews.aggregate(Avg('rating'))['rating__avg'] if is_provider else None
+    reviews = provider.reviews.all() if is_provider else None
+
+    # Handle form submissions
+    if request.method == 'POST':
+        if 'update_profile' in request.POST:  # Profile Form
+            profile_form = ProfileForm(request.POST, request.FILES, instance=user_profile)
+            if profile_form.is_valid():
+                profile_form.save()
+                return redirect('profile', user_id=user_id)
+
+        elif 'update_provider' in request.POST and is_provider:  # Pr
+            provider_form = ProviderForm(request.POST, request.FILES, instance=user_profile.provider)
+            if provider_form.is_valid():
+                provider_form.save()
+                return redirect('profile', user_id=user_id)
+
+        elif 'add_review' in request.POST and is_provider:  # Review Form
+            review_form = ReviewForm(request.POST)
+            if review_form.is_valid():
+                review = review_form.save(commit=False)
+                review.provider = provider
+                review.reviewer = user_profile
+                review.save()
+                return redirect('profile', user_id=user_id)
+
+        elif 'add_balance' in request.POST:  # Add Balance Form
+            add_balance_form = AddBalanceForm(request.POST)
+            if add_balance_form.is_valid():
+                amount = add_balance_form.cleaned_data['amount']
+                user_profile.wallet += amount
                 user_profile.save()
                 return redirect('profile', user_id=user_id)
-        except Exception as e:
-            # Log ou manipule o erro adequadamente
-            print(f"Erro ao adicionar saldo: {e}")
-            return redirect('profile', user_id=user_id)
 
-    # Formulário de avaliação
-    if request.method == 'POST' and "review" in request.POST:
-        form = ReviewForm(request.POST)
-        if form.is_valid():
-            review = form.save(commit=False)
-            review.provider = provider
-            reviewer_profile = Profile.objects.get(user=request.user)
-            review.reviewer = reviewer_profile
-            review.save()
-            return redirect('profile', user_id=user_id)
-    else:
-        form = ReviewForm()
-
-    # Passar o contexto necessário
+    # Pass context to the template
     context = {
         'profile': user_profile,
         'is_provider': is_provider,
-        'services': services,  # Adicionar serviços no contexto
+        'services': approved_services,
         'avg_rating': avg_rating,
         'reviews': reviews,
-        'form': form,
+        'profile_form': profile_form,
+        'provider_form': provider_form,
+        'review_form': review_form,
+        'add_balance_form': add_balance_form,
     }
     return render(request, 'profile.html', context)
-
-
-
-
-
-def edit_profile(request, user_id):
-    profile = get_object_or_404(Profile, user__id=user_id)
-
-    # Ensure only the profile owner can edit
-    if request.user != profile.user:
-        return redirect('profile', user_id=user_id)
-
-    if request.method == 'POST':
-        form = ProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
-            form.save()
-            return redirect('profile', user_id=user_id)
-    else:
-        form = ProfileForm(instance=profile)
-
-    return render(request, 'profile.html', {'form': form, 'profile': profile})

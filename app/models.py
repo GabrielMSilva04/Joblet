@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
@@ -12,9 +13,17 @@ class Profile(models.Model):
     location = models.CharField(max_length=100, blank=True)
     wallet = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
 
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        return self.user.username
+
+    def full_name(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+
+    def is_provider(self):
+        return hasattr(self, 'provider')
 
 
 class Provider(models.Model):
@@ -64,10 +73,17 @@ class Message(models.Model):
 
 class Review(models.Model):
     provider = models.ForeignKey(Provider, related_name='reviews', on_delete=models.CASCADE)
-    reviewer = models.ForeignKey(Profile, on_delete=models.CASCADE)
-    rating = models.DecimalField(max_digits=2, decimal_places=1)  # Rating out of 5.0
-    comment = models.TextField()
+    reviewer = models.ForeignKey(Profile, related_name='written_reviews', on_delete=models.CASCADE)
+    rating = models.DecimalField(max_digits=2, decimal_places=1)
+    comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        ordering = ['-created_at']  # Default ordering by most recent
+
+    def clean(self):
+        if not (0 <= self.rating <= 5.0):
+            raise ValidationError("Rating must be between 0 and 5.0")
 
     def __str__(self):
         return f"{self.provider.profile.user.username} - {self.rating}"

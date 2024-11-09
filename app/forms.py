@@ -56,19 +56,84 @@ class LoginForm(forms.Form):
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ['avatar']
+        fields = ['avatar', 'phone', 'location']
+        widgets = {
+            'avatar': forms.FileInput(attrs={
+                'class': 'file-input file-input-bordered w-full',
+                'accept': 'image/*',
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'Enter your phone number',
+            }),
+            'location': forms.TextInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'Enter your location',
+            }),
+        }
 
 class ProviderForm(forms.ModelForm):
+    avatar = forms.ImageField(required=False, widget=forms.FileInput(attrs={
+        'class': 'file-input file-input-bordered w-full',
+        'accept': 'image/*',
+    }))
+    phone = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        'class': 'input input-bordered w-full',
+        'placeholder': 'Enter your phone number',
+    }))
+    location = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        'class': 'input input-bordered w-full',
+        'placeholder': 'Enter your location',
+    }))
+
     class Meta:
         model = Provider
         fields = ['about', 'contact_email', 'linkedin', 'twitter', 'facebook']
         widgets = {
-            'about': forms.Textarea(attrs={'placeholder': 'Tell us about your services', 'rows': 4}),
-            'contact_email': forms.EmailInput(attrs={'placeholder': 'Enter your contact email'}),
-            'linkedin': forms.URLInput(attrs={'placeholder': 'https://linkedin.com/in/username'}),
-            'twitter': forms.URLInput(attrs={'placeholder': 'https://twitter.com/username'}),
-            'facebook': forms.URLInput(attrs={'placeholder': 'https://facebook.com/username'}),
+            'about': forms.Textarea(attrs={
+                'class': 'textarea textarea-bordered w-full',
+                'placeholder': 'Tell us about yourself',
+            }),
+            'contact_email': forms.EmailInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'Enter your email',
+            }),
+            'linkedin': forms.URLInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'https://linkedin.com/in/username',
+            }),
+            'twitter': forms.URLInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'https://twitter.com/username',
+            }),
+            'facebook': forms.URLInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'https://facebook.com/username',
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        instance = kwargs.get('instance')  # Get the Provider instance
+        if instance and instance.profile:  # Check if the instance has an associated Profile
+            initial = kwargs.setdefault('initial', {})
+            initial['avatar'] = instance.profile.avatar
+            initial['phone'] = instance.profile.phone
+            initial['location'] = instance.profile.location
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        provider = super().save(commit=False)  # Save Provider fields
+        profile = provider.profile  # Access the related Profile instance
+
+        # Update Profile fields
+        profile.avatar = self.cleaned_data.get('avatar')
+        profile.phone = self.cleaned_data.get('phone')
+        profile.location = self.cleaned_data.get('location')
+
+        if commit:
+            profile.save()  # Save Profile
+            provider.save()  # Save Provider
+        return provider
 
 class ReviewForm(forms.ModelForm):
     class Meta:
@@ -76,8 +141,23 @@ class ReviewForm(forms.ModelForm):
         fields = ['rating', 'comment']
         widgets = {
             'rating': forms.HiddenInput(),  # Hide the default rating input
-            'comment': forms.Textarea(attrs={'class': 'textarea textarea-bordered w-full', 'placeholder': 'Write your review here'}),
+            'comment': forms.Textarea(attrs={'class': 'textarea textarea-bordered w-full', 'rows': 5, 'placeholder': 'Write your review here'}),
         }
+
+class AddBalanceForm(forms.Form):
+    amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        label="Amount",
+        widget=forms.NumberInput(attrs={
+            'id': 'balance_amount',
+            'class': 'input input-bordered w-full',  # Add your desired classes
+            'step': '0.01',
+            'min': '0',
+            'required': 'required',  # Ensure the field is marked as required
+            'placeholder': 'Enter the amount to add'  # Optional placeholder
+        })
+    )
 
 class CategoryForm(forms.ModelForm):
     class Meta:
