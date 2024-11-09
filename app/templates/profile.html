@@ -193,8 +193,28 @@
                     {% for review in reviews %}
                         <div class="bg-white p-4 rounded-lg shadow-md">
                             <div class="flex items-center justify-between mb-2">
-                                <strong class="text-lg text-primary">{{ review.reviewer.user.username }}</strong>
-                                <span class="text-yellow-500 text-lg">{{ review.rating }}/5</span>
+                                <a class="flex items-center gap-2" href="{% url 'profile' review.reviewer.user.id %}">
+                                    {% if review.reviewer.user.profile.avatar %}
+                                        <img src="{{ review.reviewer.user.profile.avatar.url }}" alt="{{ review.reviewer.user.username }}" class="w-8 h-8 rounded-full">
+                                    {% else %}
+                                        <span class="text-white text-2xl font-semibold bg-primary w-8 h-8 flex items-center justify-center">
+                                            {{ review.reviewer.user.username|slice:":1"|upper }}
+                                        </span>
+                                    {% endif %}
+                                    <span class="font-semibold">{{ review.reviewer.user.username }}</span>
+                                </a>
+                                <div class="flex items-center mt-2">
+                                    <span class="text-yellow-500 text-xl font-semibold">{{ review.rating }}/5</span>
+                                    <div class="flex ml-2">
+                                        {% for i in "12345" %}
+                                            {% if i <= review.rating|floatformat:0 %}
+                                                <span class="text-yellow-500 text-lg">★</span>
+                                            {% else %}
+                                                <span class="text-gray-300 text-lg">★</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
                             <p class="mb-2">{{ review.comment }}</p>
                             <small class="text-gray-500">Reviewed on {{ review.created_at|date:"M d, Y" }}</small>
@@ -341,7 +361,7 @@
 
                     <!-- Comment Input -->
                     <div class="form-group">
-                        {{ review_form.comment.label_tag }}
+                        <label class="font-semibold">{{ review_form.comment.label_tag }}</label>
                         {{ review_form.comment }}
                     </div>
 
