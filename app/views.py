@@ -6,12 +6,12 @@ from django.shortcuts import render
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from .forms import CustomUserCreationForm, LoginForm, ProfileForm, ReviewForm, CategoryForm, AddBalanceForm, \
-    ProviderForm
+    ProviderForm, BookingForm
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.models import User
-from .models import Profile, Provider, Service, Category
+from .models import Profile, Provider, Service, Category, Booking
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseForbidden, JsonResponse
 
@@ -261,14 +261,26 @@ def services(request):
 
 
 def service_detail(request, service_id):
-    service = get_object_or_404(Service.objects.select_related('provider__profile__user').prefetch_related('provider__reviews'), id=service_id)
+    service = get_object_or_404(Service, id=service_id, is_active=True, approval='approved')
 
-    # Calcular a média das avaliações do provedor
+    # Handle the booking form
+    if request.method == 'POST':
+        form = BookingForm(request.POST)
+        if form.is_valid():
+            booking = form.save(commit=False)
+            booking.service = service
+            booking.customer = request.user.profile  # Assuming Profile is linked to User
+            booking.save()
+            return redirect('service_detail', service_id=service.id)
+    else:
+        form = BookingForm()
+
     avg_rating = service.provider.reviews.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
 
     context = {
         'service': service,
-        'avg_rating': avg_rating,  # Passar o avg_rating para o template
+        'avg_rating': avg_rating,
+        'form': form,
     }
     return render(request, 'service_detail.html', context)
 

@@ -31,7 +31,7 @@
                 <div class="mt-6 flex justify-between items-center">
                     <div>
                         <p class="text-sm text-gray-500">Posted on: {{ service.created_at|date:"M d, Y" }}</p>
-                        <p class="text-md text-gray-500 font-bold">Duration: {{ service.duration }}</p>
+                        <p class="text-md text-gray-500 font-bold">Duration: {{ service.duration }} minutes</p>
                     </div>
                     <p class="text-2xl font-bold text-primary">${{ service.price }}</p>
                 </div>
@@ -61,14 +61,51 @@
                             <p class="text-sm text-gray-500">Reviews: {{ service.provider.reviews.count }}</p>
                         </div>
                     </a>
-                    <a href="" class="btn btn-primary text-white ml-auto mr-0">Book Now</a>
+                    <button onclick="document.getElementById('bookingModal').classList.remove('hidden')"
+                            class="btn btn-primary text-white ml-auto mr-0">
+                        Book Now
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
+        <div class="bg-base-200 rounded-lg w-[30rem] max-h-[90vh] p-6 overflow-y-auto relative">
+            <h2 class="text-2xl font-bold mb-4">Book This Service</h2>
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Scheduled Time Input -->
+                <div class="form-control mb-4">
+                    <label for="id_scheduled_time" class="label font-semibold">{{ form.scheduled_time.label }}</label>
+                    {{ form.scheduled_time }}
+                    {{ form.scheduled_time.errors }}
+                </div>
+
+                <!-- Additional Details Input -->
+                <div class="form-control mb-4">
+                    <label for="id_details" class="label font-semibold">{{ form.details.label }}</label>
+                    {{ form.details }}
+                    {{ form.details.errors }}
+                </div>
+
+                <!-- Submit and Cancel Buttons -->
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn btn-secondary text-white"
+                            onclick="document.getElementById('bookingModal').classList.add('hidden')">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary text-white">Confirm Booking</button>
+                </div>
+            </form>
+
+            <!-- Close Button -->
+            <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+                    onclick="document.getElementById('bookingModal').classList.add('hidden')">
+                ✕
+            </button>
+        </div>
+    </div>
 {% endblock %}
-
-
-
-
-

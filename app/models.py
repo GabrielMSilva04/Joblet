@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from decimal import Decimal
 from datetime import datetime
 
+from django.utils.timezone import now
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -113,8 +115,27 @@ class Service(models.Model):
 class Booking(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     customer = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='bookings')
-    date = models.DateTimeField()
-    status = models.CharField(max_length=10, choices=[('pending', 'Pending'), ('completed', 'Completed'), ('cancelled', 'Cancelled')])
+    details = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(blank=True, null=True)
+    rejected_at = models.DateTimeField(blank=True, null=True)
+    modified_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    scheduled_time = models.DateTimeField()
+    # rating = models.DecimalField(max_digits=2, decimal_places=1, blank=True, null=True)
+    # feedback = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=10,
+        choices=[('pending', 'Pending'), ('completed', 'Completed'), ('cancelled', 'Cancelled')],
+        default='pending'
+    )
 
     def __str__(self):
         return f"{self.service.title} - {self.customer.user.username} - {self.status}"
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def clean(self):
+        if self.scheduled_time < now():
+            raise ValidationError("The booking date must be in the future.")
